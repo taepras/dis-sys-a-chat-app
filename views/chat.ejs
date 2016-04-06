@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Socket.io Chat</title>
+	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css">
+	<link rel="stylesheet" href="/css/style.css">
+</head>
+
+<body class="chat-room">
+	<div class="room-header">
+		<div class="room-menu">
+			<form role="form" method="post" action="/chat/invite/<%= room.id %>">
+				<div class="input-group">
+					<input type="text" name="username" class="form-control" placeholder="Username of Invitee">
+					<span class="input-group-btn">
+						<button class="btn btn-primary" type="submit">Invite</button>
+					</span>
+				</div>
+			</form>
+		</div>
+		<h1 id="room-name">
+			<a href="/"><span class="glyphicon glyphicon-home"></span></a>
+			&nbsp;
+			<%= room.local.roomName %>
+		</h1>
+	</div>
+	<ul id="messages">
+		<% room.local.messages.forEach( function(m) { %>
+			<li class="msg <% if(user.local.username == m.nickname){ %>self<% }else{ %>others<% } %>">
+				<b class="nickname"><%= m.nickname %></b>
+				<span class="time"><%= m.time %></span>
+				<div>
+					<p><%= m.message %></p>
+				</div>
+			</li>
+		<% }) %>
+	</ul>
+	<form class="container-fluid" id="send-msg">
+		<div class="row">
+			<div class="input-group">
+				<input type="text" id="msg" class="form-control">
+				<div class="input-group-btn">
+					<button type="submit" class="btn btn-block btn-primary">
+						<span class="glyphicon glyphicon-send"></span>&nbsp;send
+					</button>
+				</div>
+			</div>
+		</div>
+	</form>
+	<script src="/socket.io/socket.io.js"></script>
+	<script src="http://code.jquery.com/jquery-1.11.1.js"></script>
+	<script>
+	var socket;
+	var nickname = '<%= user.local.username %>';
+	var room = '<%= room.id %>';
+	var ongoingTypingTimeout = null;
+
+	$("html, body").animate({ scrollTop: $(document).height() }, 400);
+
+	socket = io();
+
+	socket.emit('log-in', JSON.stringify({
+		nickname: nickname,
+		room: room
+	}));
+
+	$('#send-msg').submit(function(e){
+		e.preventDefault();
+		var msg = $('#msg').val();
+		if (msg.trim()) {
+			socket.emit('chat-msg', JSON.stringify({
+				nickname: nickname,
+				message: msg
+			}));
+			var m_display = $('<li>');
+			m_display.append($('<b class="nickname">').text(nickname));
+			m_display.append($('<div>').append($('<p>').text(msg)));
+			m_display.addClass("msg self");
+			$('#messages').append(m_display);
+			$("html, body").animate({ scrollTop: $(document).height() }, 400);
+			$('#msg').val('');
+		}
+		return false;
+	});
+
+	$('#msg').keyup(function(e){
+		if(e.keyCode != 13)
+		socket.emit('typing', nickname);
+	});
+
+	socket.on('chat-msg', function(msg){
+		var m = JSON.parse(msg);
+		var m_display = $('<li>');
+		m_display.append($('<b class="nickname">').text(m.nickname));
+		m_display.append($('<div>').append($('<p>').text(m.message)));
+		m_display.addClass("msg others");
+		$('#messages').append(m_display);
+		$("html, body").animate({ scrollTop: $(document).height() }, 400);
+	});
+
+	socket.on('log-in', function(nickname){
+		var n_display = $('<li>').append($('<p>').text(nickname + ' logged in!'));
+		n_display.addClass('msg notice');
+		$('#messages').append(n_display);
+		$("html, body").animate({ scrollTop: $(document).height() }, 400);
+	});
+
+	socket.on('log-out', function(nickname){
+		var n_display = $('<li>').append($('<p>').text(nickname + ' logged out.'));
+		n_display.addClass('msg notice');
+		$('#messages').append(n_display);
+		$("html, body").animate({ scrollTop: $(document).height() }, 400);
+	});
+
+	socket.on('typing', function(nickname){
+		if($('#typing-' + nickname).length <= 0){
+			$('#send-msg').prepend(
+				$('<p class="typing" id="typing-' + nickname + '">')
+				.text(nickname + ' is typing...')
+			);
+		} else {
+			window.clearTimeout(ongoingTypingTimeout);
+		}
+		ongoingTypingTimeout = window.setTimeout(function(){
+			$('#typing-' + nickname).remove();
+		}, 500);
+	});
+
+	</script>
+</body>
+</html>

@@ -1,2 +1,2 @@
-# dis-sys-a-chat-app
-dis sys a chat app
+# DIS SYS A CHAT APP!
+do not forget to 'npm install'

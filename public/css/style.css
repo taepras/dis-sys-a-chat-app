@@ -1,7 +1,44 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
-body{
+body {
 	background: #f8f8f8;
+}
+
+.container {
+	max-width: 600px;
+}
+
+hr{
+	border-color: #aaa;
+}
+
+.chat-room {
+	padding-top: 80px;
+}
+
+.room-header {
+	width: 100%;
+	position: fixed;
+	background: #444;
+	color: #fff;
+	height: 80px;
+	top: 0;
+	padding: 0 20px;
+}
+
+.room-menu {
+	max-width: 30%;
+	margin-top: 20px;
+	float: right;
+}
+
+.room-header a{
+	color: #fff;
+	opacity: 0.6;
+}
+
+.room-header a:hover{
+	opacity: 1;
 }
 
 #room-name{

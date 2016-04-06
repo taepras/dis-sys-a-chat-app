@@ -1,0 +1,54 @@
+<!-- views/profile.ejs -->
+<!doctype html>
+<html>
+<head>
+	<title>Node Authentication</title>
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<link rel="stylesheet" href="//netdna.bootstrapcdn.com/bootstrap/3.0.2/css/bootstrap.min.css">
+	<link rel="stylesheet" href="//netdna.bootstrapcdn.com/font-awesome/4.0.3/css/font-awesome.min.css">
+	<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+	<div class="container">
+		<div class="page-header text-center">
+			<h1><span class="glyphicon glyphicon-user"></span> <%= user.local.username %></h1>
+			<a href="/logout" class="btn btn-default btn-danger">Logout</a>
+		</div>
+		<div class="row">
+			<div class="col-sm-12">
+				<form role="form" method="post" action="/chat/create">
+					<div class="input-group">
+						<input type="text" name="roomname" class="form-control" placeholder="New Room Name">
+						<span class="input-group-btn">
+							<button class="btn btn-primary" type="submit">Create Room</button>
+						</span>
+					</div>
+				</form>
+				<!-- <hr>
+				<h2>Join New Room</h2>
+				<form role="form" method="post" action="/chat/join">
+					<div class="input-group">
+						<input type="text" name="roomname" class="form-control" placeholder="New Room Name">
+						<span class="input-group-btn">
+							<button class="btn btn-primary" type="submit">Join Room</button>
+						</span>
+					</div>
+				</form> -->
+				<hr>
+				<h2>Joined Rooms</h2>
+				<% joinedRooms.forEach(function(room) { %>
+					<a href="/chat/<%= room.id %>" class="btn btn-block btn-primary btn-lg"><%= room.local.roomName %></a>
+				<% }); %>
+				<hr>
+			</div>
+		</div>
+	</div>
+	<script src="/socket.io/socket.io.js"></script>
+	<script src="http://code.jquery.com/jquery-1.11.1.js"></script>
+	<script>
+	var socket = io();
+	var nickname = '<%= user.local.username %>';
+	socket.emit('sign-in', JSON.stringify({ nickname: nickname }));
+	</script>
+</body>
+</html>
