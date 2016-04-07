@@ -11,9 +11,11 @@
 <body class="chat-room">
 	<div class="room-header">
 		<div class="room-menu">
-			<form role="form" class="form-inline" method="post" action="/chat/invite/<%= room.id %>">
+			<form role="form" class="form-inline" method="post" action="/chat/leave/<%= room.id %>" style="display:inline-block">
+				<button type="submit" id="leave-room" class="btn btn-danger">Leave Room</button>
+			</form>
+			<form role="form" class="form-inline" method="post" action="/chat/invite/<%= room.id %>" style="display:inline-block">
 				<button type="button" id="stop-listening" class="btn btn-warning">Stop Listening</button>
-				<button type="button" id="leave-room" class="btn btn-danger">Leave Room</button>
 				<div class="input-group">
 					<input type="text" name="username" class="form-control" placeholder="Username of Invitee">
 					<span class="input-group-btn">
@@ -29,15 +31,7 @@
 		</h1>
 	</div>
 	<ul id="messages">
-		<% room.local.messages.forEach( function(m) { %>
-			<li class="msg <% if(user.local.username == m.nickname){ %>self<% }else{ %>others<% } %>">
-				<b class="nickname"><%= m.nickname %></b>
-				<span class="time"><%= m.time %></span>
-				<div>
-					<p><%= m.message %></p>
-				</div>
-			</li>
-		<% }) %>
+
 	</ul>
 	<form class="container-fluid" id="send-msg">
 		<div class="row">
@@ -54,21 +48,43 @@
 	<script src="/socket.io/socket.io.js"></script>
 	<script src="http://code.jquery.com/jquery-1.11.1.js"></script>
 	<script>
+	var nickname = '<%= user.local.username %>';
+
+	function msgDisplay(data){
+		var m_display = $('<li>');
+		m_display.append($('<b class="nickname">').text(data.nickname));
+
+		var utcSeconds = data.time;
+		var d = new Date(0);
+		d.setUTCMilliseconds(utcSeconds);
+		var timeString = d.getHours() + ':' + d.getMinutes();
+
+		m_display.append($('<span class="time">').text(timeString));
+		m_display.append($('<div>').append($('<p>').text(data.message)));
+		if(data.nickname == nickname)
+			m_display.addClass("msg self");
+		else
+			m_display.addClass("msg others");
+		return m_display;
+	}
+
 	<% roomIndex = user.local.ridJoined.indexOf(room.id) %>
 	var socket;
-	var nickname = '<%= user.local.username %>';
 	var room = '<%= room.id %>';
 	var roomMsgCount = <%= room.local.messages.length %>;
 	var ongoingTypingTimeout = null;
 	var latestRead = <%= user.local.ridJoined[roomIndex].latestRead %>;
 	var listening = true;
 
-	console.log(latestRead);
 	$.ajax({
-		url: '/chat/' + room + '/message/start/' + latestRead,
+		url: '/chat/message/' + room,
 		method: 'get',
-		success: function(data, textStatus, jqXHR){
-			console.log(data);
+		success: function(dataJSON, textStatus, jqXHR){
+			var data = JSON.parse(dataJSON);
+			for(var i = 0; i < data.length; i++){
+				$('#messages').append(msgDisplay(data[i]));
+			}
+			$("html, body").animate({ scrollTop: $(document).height() }, 400);
 		}
 	});
 
@@ -76,18 +92,24 @@
 		listening = !listening;
 		console.log('listening: ' + listening);
 		if(listening){
-			console.log('/chat/' + room + '/message/start/' + latestRead);
 			$.ajax({
-				url: '/chat/' + room + '/message/start/' + latestRead,
+				url: '/chat/message/' + room + '/start/' + latestRead,
 				method: 'get',
-				success: function(data, textStatus, jqXHR){
-					console.log(JSON.parse(data));
+				success: function(dataJSON, textStatus, jqXHR){
+					var data = JSON.parse(dataJSON);
+					for(var i = 0; i < data.length; i++){
+						$('#messages').append(msgDisplay(data[i]));
+					}
+					$("html, body").animate({ scrollTop: $(document).height() }, 400);
 				}
 			});
+			$(this).addClass('btn-warning');
+			$(this).removeClass('btn-danger');
+		} else {
+			$(this).removeClass('btn-warning');
+			$(this).addClass('btn-danger');
 		}
 	});
-
-	$("html, body").animate({ scrollTop: $(document).height() }, 400);
 
 	socket = io();
 
@@ -96,23 +118,18 @@
 		room: room
 	}));
 
-	latestRead = roomMsgCount - 1;
+	latestRead = roomMsgCount;
 	socket.emit('read', JSON.stringify({nickname: nickname, latestRead: latestRead}));
 
 	$('#send-msg').submit(function(e){
 		e.preventDefault();
 		var msg = $('#msg').val();
 		if (msg.trim()) {
-			socket.emit('chat-msg', JSON.stringify({
+			var msgInfo = {
 				nickname: nickname,
 				message: msg
-			}));
-			var m_display = $('<li>');
-			m_display.append($('<b class="nickname">').text(nickname));
-			m_display.append($('<div>').append($('<p>').text(msg)));
-			m_display.addClass("msg self");
-			$('#messages').append(m_display);
-			$("html, body").animate({ scrollTop: $(document).height() }, 400);
+			}
+			socket.emit('chat-msg', JSON.stringify(msgInfo));
 			$('#msg').val('');
 		}
 		return false;
@@ -124,22 +141,18 @@
 	});
 
 	socket.on('chat-msg', function(msg){
-		if(listening){
-			var m = JSON.parse(msg);
-			var m_display = $('<li>');
-			m_display.append($('<b class="nickname">').text(m.nickname));
-			m_display.append($('<div>').append($('<p>').text(m.message)));
-			m_display.addClass("msg others");
-			$('#messages').append(m_display);
-			$("html, body").animate({ scrollTop: $(document).height() }, 400);
+		if(!listening) return;
+		var m = JSON.parse(msg);
+		$('#messages').append(msgDisplay(m));
+		$("html, body").animate({ scrollTop: $(document).height() }, 400);
 
-			roomMsgCount++;
-			latestRead = roomMsgCount;
-			socket.emit('read', JSON.stringify({nickname: nickname, latestRead: latestRead}));
-		}
+		roomMsgCount++;
+		latestRead = roomMsgCount;
+		socket.emit('read', JSON.stringify({nickname: nickname, latestRead: latestRead}));
 	});
 
 	socket.on('log-in', function(nickname){
+		if(!listening) return;
 		var n_display = $('<li>').append($('<p>').text(nickname + ' logged in!'));
 		n_display.addClass('msg notice');
 		$('#messages').append(n_display);
@@ -147,6 +160,7 @@
 	});
 
 	socket.on('log-out', function(nickname){
+		if(!listening) return;
 		var n_display = $('<li>').append($('<p>').text(nickname + ' logged out.'));
 		n_display.addClass('msg notice');
 		$('#messages').append(n_display);
@@ -154,6 +168,7 @@
 	});
 
 	socket.on('typing', function(nickname){
+		if(!listening) return;
 		if($('#typing-' + nickname).length <= 0){
 			$('#send-msg').prepend(
 				$('<p class="typing" id="typing-' + nickname + '">')

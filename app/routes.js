@@ -90,8 +90,7 @@ module.exports = function(app, passport) {
 
 	})
 
-	app.get('/chat/*/message/start/*', isLoggedIn, function(req, res){
-		console.log("!");
+	app.get('/chat/message/*/start/*', isLoggedIn, function(req, res){
 		var rid = req.params[0];
 		var start = req.params[1];
 		Room.findOne({ '_id': rid }, function(err, room){
@@ -103,19 +102,44 @@ module.exports = function(app, passport) {
 				return false;
 			}
 		});
-	})
+	});
+
+	app.get('/chat/message/*', isLoggedIn, function(req, res){
+		console.log("!");
+		var rid = req.params[0];
+		Room.findOne({ '_id': rid }, function(err, room){
+			if ( room && req.user.local.ridJoined.indexOf(room.id) >= 0 ) {
+				return res.send(JSON.stringify(room.local.messages));
+			} else {
+				console.log('forbidden: user did not joined this room.');
+				return false;
+			}
+		});
+	});
+
+	app.post('/chat/leave/*', function(req, res){
+		var rid = req.params[0];
+		User.findOne({ '_id': req.user.id }, function(err, user){
+			console.log(rid);
+			var roomIndex = user.local.ridJoined.indexOf(rid);
+			user.local.ridJoined.splice(roomIndex, 1);
+			user.save();
+			res.redirect('/');
+		});
+	});
 
 	app.get('/chat/*', isLoggedIn, function(req, res){
 		var rid = req.params[0];
 		Room.findOne({ '_id': rid }, function(err, room){
 			if ( room && req.user.local.ridJoined.indexOf(room.id) >= 0 )
-			res.render('chat.ejs', { room: room, user: req.user });
+				res.render('chat.ejs', { room: room, user: req.user });
 			else {
 				console.log('forbidden: user did not joined this room.');
 				res.redirect('/');
 			}
 		});
 	})
+
 
 };
 

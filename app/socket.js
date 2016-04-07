@@ -25,7 +25,7 @@ module.exports = function(io){
 			msg.time = Date.now();
 			roomObj.local.messages.push(msg);
 			roomObj.save();
-			socket.broadcast.to(room).emit('chat-msg', msgJSON);
+			io.in(room).emit('chat-msg', JSON.stringify(msg));
 		});
 
 		socket.on('typing', function(nickname){
