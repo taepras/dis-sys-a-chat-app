@@ -1,15 +1,23 @@
 var User = require('../app/models/user');
 var Room = require('../app/models/room');
+var Helpers = require('./helpers');
 
 module.exports = function(app, passport) {
 
 	app.get('/', function(req, res) {
 		if(req.isAuthenticated()){
-			var joinedRoomsIds = req.user.local.ridJoined;
+			var joinedRoomsIds = [];
+			req.user.local.ridJoined.forEach(function(room){
+				joinedRoomsIds.push(room.rid);
+			});
 			Room.find({ '_id': { $in: joinedRoomsIds } }, function(err, rooms){
+				for(var i = 0; i < rooms.length; i++){
+					var roomIndex = Helpers.indexOfRid(req.user.local.ridJoined, rooms[i].id);
+					rooms[i].unreadCount = rooms[i].local.messages.length - req.user.local.ridJoined[roomIndex].nextRead;
+				}
 				res.render('home.ejs', { user : req.user, joinedRooms : rooms });
 			});
-		}else
+		} else
 		res.render('login.ejs', { message: req.flash('loginMessage') });
 	});
 
@@ -29,7 +37,7 @@ module.exports = function(app, passport) {
 		failureFlash : true
 	}));
 
-	app.get('/logout', function(req, res) {
+	app.get('/logout', isLoggedIn, function(req, res) {
 		req.logout();
 		res.redirect('/');
 	});
@@ -47,7 +55,10 @@ module.exports = function(app, passport) {
 
 		var rid = room.id;
 
-		req.user.local.ridJoined.push(rid);
+		req.user.local.ridJoined.push({
+			rid: rid,
+			nextRead: 0
+		});
 		req.user.local.save();
 		res.redirect('/chat/' + rid);
 	})
@@ -57,7 +68,7 @@ module.exports = function(app, passport) {
 		Room.findOne({ 'local.roomName': roomName }, function(err, room){
 			if ( !room ) {
 				res.redirect('/');
-			} else if( req.user.local.ridJoined.indexOf(room.id) >= 0 ) {
+			} else if( Helpers.indexOfRid(req.user.local.ridJoined, room.id) >= 0 ) {
 				res.redirect('/');
 			} else {
 				req.user.local.ridJoined.push(room.id);
@@ -65,6 +76,12 @@ module.exports = function(app, passport) {
 				res.redirect('/chat/' + room.id);
 			}
 		});
+
+		req.user.local.ridJoined.push({
+			rid: rid,
+			nextRead: 0
+		});
+		req.user.local.save();
 	})
 
 	app.post('/chat/invite/*', isLoggedIn, function(req, res){
@@ -77,10 +94,13 @@ module.exports = function(app, passport) {
 				Room.findOne({ '_id': rid }, function(err, room){
 					if ( !room ) {
 						res.redirect('/');
-					} else if( invitee.local.ridJoined.indexOf(room.id) >= 0 ) {
+					} else if( Helpers.indexOfRid(invitee.local.ridJoined, room.id) >= 0 ) {
 						res.redirect('/');
 					} else {
-						invitee.local.ridJoined.push(room.id);
+						invitee.local.ridJoined.push({
+							rid: rid,
+							nextRead: 0
+						});
 						invitee.local.save();
 						res.redirect('/chat/' + room.id);
 					}
@@ -94,7 +114,7 @@ module.exports = function(app, passport) {
 		var rid = req.params[0];
 		var start = req.params[1];
 		Room.findOne({ '_id': rid }, function(err, room){
-			if ( room && req.user.local.ridJoined.indexOf(room.id) >= 0 ) {
+			if ( room && Helpers.indexOfRid(req.user.local.ridJoined, room.id) >= 0 ) {
 				console.log(room.local.messages.slice(start));
 				return res.send(JSON.stringify(room.local.messages.slice(start)));
 			} else {
@@ -108,7 +128,7 @@ module.exports = function(app, passport) {
 		console.log("!");
 		var rid = req.params[0];
 		Room.findOne({ '_id': rid }, function(err, room){
-			if ( room && req.user.local.ridJoined.indexOf(room.id) >= 0 ) {
+			if ( room && Helpers.indexOfRid(req.user.local.ridJoined, room.id) >= 0 ) {
 				return res.send(JSON.stringify(room.local.messages));
 			} else {
 				console.log('forbidden: user did not joined this room.');
@@ -117,21 +137,18 @@ module.exports = function(app, passport) {
 		});
 	});
 
-	app.post('/chat/leave/*', function(req, res){
+	app.post('/chat/leave/*', isLoggedIn, function(req, res){
 		var rid = req.params[0];
-		User.findOne({ '_id': req.user.id }, function(err, user){
-			console.log(rid);
-			var roomIndex = user.local.ridJoined.indexOf(rid);
-			user.local.ridJoined.splice(roomIndex, 1);
-			user.save();
-			res.redirect('/');
-		});
+		var roomIndex = Helpers.indexOfRid(req.user.local.ridJoined, rid);
+		req.user.local.ridJoined.splice(roomIndex, 1);
+		req.user.save();
+		res.redirect('/');
 	});
 
 	app.get('/chat/*', isLoggedIn, function(req, res){
 		var rid = req.params[0];
 		Room.findOne({ '_id': rid }, function(err, room){
-			if ( room && req.user.local.ridJoined.indexOf(room.id) >= 0 )
+			if ( room && Helpers.indexOfRid(req.user.local.ridJoined, room.id) >= 0 )
 				res.render('chat.ejs', { room: room, user: req.user });
 			else {
 				console.log('forbidden: user did not joined this room.');
@@ -139,8 +156,6 @@ module.exports = function(app, passport) {
 			}
 		});
 	})
-
-
 };
 
 function isLoggedIn(req, res, next) {

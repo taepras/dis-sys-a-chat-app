@@ -37,7 +37,12 @@
 				<hr>
 				<h2>Joined Rooms</h2>
 				<% joinedRooms.forEach(function(room) { %>
-					<a href="/chat/<%= room.id %>" class="btn btn-block btn-primary btn-lg"><%= room.local.roomName %></a>
+					<a href="/chat/<%= room.id %>" class="btn btn-block btn-primary btn-lg">
+						<%= room.local.roomName %>
+						<% if(room.unreadCount > 0) { %>
+							<span class="label label-danger"><%= room.unreadCount %></span>
+						<% } %>
+					</a>
 				<% }); %>
 				<hr>
 			</div>

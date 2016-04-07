@@ -1,5 +1,6 @@
 var User = require('../app/models/user');
 var Room = require('../app/models/room');
+var Helpers = require('./helpers');
 
 module.exports = function(io){
 	io.on('connection', function(socket){
@@ -29,7 +30,6 @@ module.exports = function(io){
 		});
 
 		socket.on('typing', function(nickname){
-			// console.log(nickname + ' is typing...');
 			socket.broadcast.to(room).emit('typing', nickname);
 		});
 
@@ -42,8 +42,9 @@ module.exports = function(io){
 			console.log('read: ' + readInfoJSON);
 			readInfo = JSON.parse(readInfoJSON)
 			User.findOne({'local.username': readInfo.nickname}, function(err, user){
-				var roomIndex = user.local.ridJoined.indexOf(room);
-				user.local.ridJoined[roomIndex].latestRead = readInfo.latestRead;
+				var roomIndex = Helpers.indexOfRid(user.local.ridJoined, room);
+				user.local.ridJoined[roomIndex].nextRead = readInfo.nextRead;
+				user.markModified('local.ridJoined');
 				user.save();
 			})
 		});
