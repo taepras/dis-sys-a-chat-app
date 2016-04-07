@@ -11,7 +11,9 @@
 <body class="chat-room">
 	<div class="room-header">
 		<div class="room-menu">
-			<form role="form" method="post" action="/chat/invite/<%= room.id %>">
+			<form role="form" class="form-inline" method="post" action="/chat/invite/<%= room.id %>">
+				<button type="button" id="stop-listening" class="btn btn-warning">Stop Listening</button>
+				<button type="button" id="leave-room" class="btn btn-danger">Leave Room</button>
 				<div class="input-group">
 					<input type="text" name="username" class="form-control" placeholder="Username of Invitee">
 					<span class="input-group-btn">
@@ -59,7 +61,7 @@
 	var roomMsgCount = <%= room.local.messages.length %>;
 	var ongoingTypingTimeout = null;
 	var latestRead = <%= user.local.ridJoined[roomIndex].latestRead %>;
-	var reading = true;
+	var listening = true;
 
 	console.log(latestRead);
 	$.ajax({
@@ -67,6 +69,21 @@
 		method: 'get',
 		success: function(data, textStatus, jqXHR){
 			console.log(data);
+		}
+	});
+
+	$('#stop-listening').click(function(){
+		listening = !listening;
+		console.log('listening: ' + listening);
+		if(listening){
+			console.log('/chat/' + room + '/message/start/' + latestRead);
+			$.ajax({
+				url: '/chat/' + room + '/message/start/' + latestRead,
+				method: 'get',
+				success: function(data, textStatus, jqXHR){
+					console.log(JSON.parse(data));
+				}
+			});
 		}
 	});
 
@@ -107,17 +124,17 @@
 	});
 
 	socket.on('chat-msg', function(msg){
-		var m = JSON.parse(msg);
-		var m_display = $('<li>');
-		m_display.append($('<b class="nickname">').text(m.nickname));
-		m_display.append($('<div>').append($('<p>').text(m.message)));
-		m_display.addClass("msg others");
-		$('#messages').append(m_display);
-		$("html, body").animate({ scrollTop: $(document).height() }, 400);
+		if(listening){
+			var m = JSON.parse(msg);
+			var m_display = $('<li>');
+			m_display.append($('<b class="nickname">').text(m.nickname));
+			m_display.append($('<div>').append($('<p>').text(m.message)));
+			m_display.addClass("msg others");
+			$('#messages').append(m_display);
+			$("html, body").animate({ scrollTop: $(document).height() }, 400);
 
-		roomMsgCount++;
-		if(reading){
-			latestRead = roomMsgCount - 1;
+			roomMsgCount++;
+			latestRead = roomMsgCount;
 			socket.emit('read', JSON.stringify({nickname: nickname, latestRead: latestRead}));
 		}
 	});

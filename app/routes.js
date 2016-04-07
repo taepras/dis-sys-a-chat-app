@@ -90,6 +90,21 @@ module.exports = function(app, passport) {
 
 	})
 
+	app.get('/chat/*/message/start/*', isLoggedIn, function(req, res){
+		console.log("!");
+		var rid = req.params[0];
+		var start = req.params[1];
+		Room.findOne({ '_id': rid }, function(err, room){
+			if ( room && req.user.local.ridJoined.indexOf(room.id) >= 0 ) {
+				console.log(room.local.messages.slice(start));
+				return res.send(JSON.stringify(room.local.messages.slice(start)));
+			} else {
+				console.log('forbidden: user did not joined this room.');
+				return false;
+			}
+		});
+	})
+
 	app.get('/chat/*', isLoggedIn, function(req, res){
 		var rid = req.params[0];
 		Room.findOne({ '_id': rid }, function(err, room){
