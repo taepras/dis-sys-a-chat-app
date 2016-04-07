@@ -12,7 +12,6 @@ module.exports = function(io){
 			console.log('"' + login.nickname + '" logged in to room "' + login.room + '"');
 			name = login.nickname;
 			Room.findOne({ '_id': login.room }, function(err, foundRoom){
-				console.log(foundRoom);
 				roomObj = foundRoom;
 				room = foundRoom.id;
 				socket.join(room);
@@ -20,23 +19,33 @@ module.exports = function(io){
 			});
 		});
 
-		socket.on('chat-msg', function(msg){
-			console.log('incoming: ' + msg);
-			msgObj = JSON.parse(msg)
-			msgObj.time = Date.now();
-			roomObj.local.messages.push(msgObj);
+		socket.on('chat-msg', function(msgJSON){
+			console.log('incoming: ' + msgJSON);
+			msg = JSON.parse(msgJSON)
+			msg.time = Date.now();
+			roomObj.local.messages.push(msg);
 			roomObj.save();
-			socket.broadcast.to(room).emit('chat-msg', msg);
+			socket.broadcast.to(room).emit('chat-msg', msgJSON);
 		});
 
 		socket.on('typing', function(nickname){
-			console.log(nickname + ' is typing...');
+			// console.log(nickname + ' is typing...');
 			socket.broadcast.to(room).emit('typing', nickname);
 		});
 
 		socket.on('disconnect', function(){
 			console.log(name + ' disconnected');
 			socket.broadcast.to(room).emit('log-out', name);
+		});
+
+		socket.on('read', function(readInfoJSON){
+			console.log('read: ' + readInfoJSON);
+			readInfo = JSON.parse(readInfoJSON)
+			User.findOne({'local.username': readInfo.nickname}, function(err, user){
+				var roomIndex = user.local.ridJoined.indexOf(room);
+				user.local.ridJoined[roomIndex].latestRead = readInfo.latestRead;
+				user.save();
+			})
 		});
 	});
 }

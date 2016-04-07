@@ -52,10 +52,23 @@
 	<script src="/socket.io/socket.io.js"></script>
 	<script src="http://code.jquery.com/jquery-1.11.1.js"></script>
 	<script>
+	<% roomIndex = user.local.ridJoined.indexOf(room.id) %>
 	var socket;
 	var nickname = '<%= user.local.username %>';
 	var room = '<%= room.id %>';
+	var roomMsgCount = <%= room.local.messages.length %>;
 	var ongoingTypingTimeout = null;
+	var latestRead = <%= user.local.ridJoined[roomIndex].latestRead %>;
+	var reading = true;
+
+	console.log(latestRead);
+	$.ajax({
+		url: '/chat/' + room + '/message/start/' + latestRead,
+		method: 'get',
+		success: function(data, textStatus, jqXHR){
+			console.log(data);
+		}
+	});
 
 	$("html, body").animate({ scrollTop: $(document).height() }, 400);
 
@@ -65,6 +78,9 @@
 		nickname: nickname,
 		room: room
 	}));
+
+	latestRead = roomMsgCount - 1;
+	socket.emit('read', JSON.stringify({nickname: nickname, latestRead: latestRead}));
 
 	$('#send-msg').submit(function(e){
 		e.preventDefault();
@@ -98,6 +114,12 @@
 		m_display.addClass("msg others");
 		$('#messages').append(m_display);
 		$("html, body").animate({ scrollTop: $(document).height() }, 400);
+
+		roomMsgCount++;
+		if(reading){
+			latestRead = roomMsgCount - 1;
+			socket.emit('read', JSON.stringify({nickname: nickname, latestRead: latestRead}));
+		}
 	});
 
 	socket.on('log-in', function(nickname){
